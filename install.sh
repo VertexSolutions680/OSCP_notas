@@ -1,97 +1,92 @@
 #!/bin/bash
 
-if [ "`whoami`" != "root" ]; then
-	echo "Has de ser root o ejecutarlo como root para poder seguir"
-	exit
+# Check if the script is being run as root
+if [ "$(whoami)" != "root" ]; then
+    echo "You must be root to execute this script."
+    exit 1
 fi
 
-DIRNAME="$(dirname $0)"
+# Variables
+DIRNAME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALLATION_DIR="/opt"
 INSTALLATION_PROJECT="$INSTALLATION_DIR/OSCP"
 EXECUTABLE_DIR="$INSTALLATION_PROJECT/notas.py"
 
+# Colors for output
 RESTORE='\033[0m'
 RED='\033[00;31m'
 GREEN='\033[00;32m'
 LBLUE='\033[01;34m'
 
+# Clear the screen
 clear
 
+# Logo
 echo -e "$GREEN░▀█▀░█▀█░█▀▀░▀█▀░█▀█░█░░░█▀█░█▀▀░▀█▀░█▀█░█▀█░░░█▀█░█▀▀░█▀▀░█▀█$RESTORE"
 echo -e "$GREEN░░█░░█░█░▀▀█░░█░░█▀█░█░░░█▀█░█░░░░█░░█░█░█░█░░░█░█░▀▀█░█░░░█▀▀$RESTORE"
 echo -e "$GREEN░▀▀▀░▀░▀░▀▀▀░░▀░░▀░▀░▀▀▀░▀░▀░▀▀▀░▀▀▀░▀▀▀░▀░▀░░░▀▀▀░▀▀▀░▀▀▀░▀░░$RESTORE"
 
-echo -e "\n$GREEN[+]$RESTORE Instalando aplicacion en" $INSTALLATION_DIR 
+echo -e "\n$GREEN[+]$RESTORE Installing application in" $INSTALLATION_DIR 
 
-# Comprueba que estan instaladas las dependencias de python necesarias
-echo -e "$GREEN[+]$RESTORE Comprobando dependencias de python"
-python -c "import termcolor" 2> /dev/null
-if [ $? -ne 0 ]; then
-	echo -e "$LBLUE[!]$RESTORE Instalando libreria termcolor"
-	pip install termcolor
+# Check Python dependencies
+echo -e "$GREEN[+]$RESTORE Checking Python dependencies"
+if ! python -c "import termcolor" 2> /dev/null; then
+    echo -e "$LBLUE[!]$RESTORE Installing termcolor library"
+    pip install termcolor
 fi
-python -c "import git" 2> /dev/null
-if [ $? -ne 0 ]; then
-	echo -e "$LBLUE[!]$RESTORE Instalando libreria git"
-	pip install gitpython
-fi
-python -c "import shutil" 2> /dev/null
-if [ $? -ne 0 ]; then
-	echo -e "$LBLUE[!]$RESTORE Instalando libreria shutil"
-	pip install shutilwhich
-fi
-echo -e "$GREEN[+]$RESTORE Librerias de python comprobadas e instaladas"
 
-# Comprueba si existe el directorio de instalacion
-if [ ! -d $INSTALLATION_PROJECT ]; then
-	mkdir $INSTALLATION_PROJECT 
-	echo -e "$GREEN[+]$RESTORE Directorio" $INSTALLATION_PROJECT" creado correctamente"
-	
-	# Copia ficheros y directorios al directorio de instalacion	
-	find . -maxdepth 1 -type f  -exec cp {} $INSTALLATION_PROJECT \;
-	find . -maxdepth 1 -type d  -not -path '*/\.*' -exec cp -r {} $INSTALLATION_PROJECT \;
+if ! python -c "import git" 2> /dev/null; then
+    echo -e "$LBLUE[!]$RESTORE Installing gitpython library"
+    pip install gitpython
+fi
 
-	echo -e "$GREEN[+]$RESTORE Ficheros copiados a $INSTALLATION_PROJECT correctamente"
+echo -e "$GREEN[+]$RESTORE All necessary Python libraries installed"
+
+# Check if the installation directory exists
+if [ ! -d "$INSTALLATION_PROJECT" ]; then
+    mkdir -p "$INSTALLATION_PROJECT"
+    echo -e "$GREEN[+]$RESTORE Directory $INSTALLATION_PROJECT successfully created"
+
+    # Copy files and directories to the installation directory
+    cp -r "$DIRNAME"/* "$INSTALLATION_PROJECT"
+    echo -e "$GREEN[+]$RESTORE Files successfully copied to $INSTALLATION_PROJECT"
 else
-	echo -e "$RED[-]$RESTORE El directorio $INSTALLATION_PROJECT ya existe\n"
-	exit
+    echo -e "$RED[-]$RESTORE The directory $INSTALLATION_PROJECT already exists"
+    exit 1
 fi
 
-# Crea un alias para ejecutarlo desde cualquier sitio de la terminal
-echo -e "$GREEN[+]$RESTORE Creando alias de la aplicacion\n"
+# Create an alias to run the script from anywhere in the terminal
+echo -e "$GREEN[+]$RESTORE Creating an alias for the application"
+ALIASES_FILE=""
+
 if [ -f ~/.aliases ]; then
-	# Comprueba si existe ya un alias creado para este programa
-	existe=`grep "notas.py" ~/.aliases`
-	if [ $? -ne 0 ]; then
-		echo 'alias notas="python '$EXECUTABLE_DIR'"' >> ~/.aliases
-	fi
+    ALIASES_FILE=~/.aliases
 elif [ -f ~/.bash_aliases ]; then
-	# Comprueba si existe ya un alias creado para este programa
-	existe=`grep "notas.py" ~/.bash_aliases`
-	if [ $? -ne 0 ]; then
-		echo 'alias notas="python '$EXECUTABLE_DIR'"' >> ~/.bash_aliases
-	fi
+    ALIASES_FILE=~/.bash_aliases
 elif [ -f ~/.bashrc ]; then
-	# Comprueba si existe ya un alias creado para este programa
-	existe=`grep "notas.py" ~/.bashrc`
-	if [ $? -ne 0 ]; then
-		echo 'alias notas="python '$EXECUTABLE_DIR'"' >> ~/.bashrc
-	fi
+    ALIASES_FILE=~/.bashrc
 fi
 
-# Si se va a usar el programa con un usuario que no sea root se han de cambiar
-# los permisos de la carpeta donde se va a instalar
-read -e -p "¿Vas a usar la aplicacion con un usuario sin privilegios? [s/n]: " opt
-if [ "$opt" == "s" ]; then
-	read -e -p "Usuario con el que se va a ejecutar: " username
-	check_user=`cat /etc/passwd | cut -d':' -f1 | grep $username`
-	if [ "$check_user" == "$username" ]; then 
-		chown -R $username:$username $INSTALLATION_PROJECT
-		echo -e "$GREEN[+]$RESTORE Permisos cambiados correctamente"
-	else 
-		echo -e "$RED[-]$RESTORE El usuario introducido no existe."
-	fi
+if [ -n "$ALIASES_FILE" ]; then
+    if ! grep -q "notas.py" "$ALIASES_FILE"; then
+        echo 'alias notas="python '"$EXECUTABLE_DIR"'"' >> "$ALIASES_FILE"
+        echo -e "$GREEN[+]$RESTORE Alias added to $ALIASES_FILE"
+    else
+        echo -e "$LBLUE[!]$RESTORE Alias already exists in $ALIASES_FILE"
+    fi
 fi
 
-echo -e "\n$GREEN[*]$RESTORE Instalacion completa creada en" $INSTALLATION_PROJECT 
-echo -e "\n$LBLUE[!]$RESTORE Para ejecutar la aplicacion abre otra terminal y escribe notas\n"
+# Change permissions if the program will be used by a non-root user
+read -e -p "Will you use the application as a non-privileged user? [y/n]: " opt
+if [ "$opt" == "y" ]; then
+    read -e -p "Enter the username: " username
+    if id -u "$username" > /dev/null 2>&1; then
+        chown -R "$username:$username" "$INSTALLATION_PROJECT"
+        echo -e "$GREEN[+]$RESTORE Permissions successfully changed"
+    else
+        echo -e "$RED[-]$RESTORE The specified user does not exist."
+    fi
+fi
+
+echo -e "\n$GREEN[*]$RESTORE Installation completed in $INSTALLATION_PROJECT"
+echo -e "\n$LBLUE[!]$RESTORE To run the application, open a new terminal session and type 'notas'\n"
